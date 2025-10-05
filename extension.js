@@ -22,21 +22,58 @@ class GolangImplementationLensProvider {
         
         // Regex to match Go interface declarations: type InterfaceName interface {
         const interfaceRegex = /^\s*type\s+(\w+)\s+interface\s*\{/;
+        const methodRegex = /^\s*(\w+)\s*\(/;
+        
+        let currentInterface = null;
+        let braceCount = 0;
 
         lines.forEach((line, index) => {
-            const match = line.match(interfaceRegex);
-            if (match) {
-                const interfaceName = match[1];
-                console.error(`✅ Found interface: ${interfaceName} at line ${index + 1}`);
+            // Detecta início da interface
+            const interfaceMatch = line.match(interfaceRegex);
+            if (interfaceMatch) {
+                currentInterface = interfaceMatch[1];
+                braceCount = 1;
+                console.error(`✅ Found interface: ${currentInterface} at line ${index + 1}`);
                 const range = new vscode.Range(index, 0, index, line.length);
                 
+                // CodeLens para toda a interface
                 const codeLens = new vscode.CodeLens(range, {
                     title: "👁️ implementations",
                     command: 'golang-implementation-lens.showImplementations',
-                    arguments: [interfaceName, document.uri]
+                    arguments: [currentInterface, document.uri]
                 });
                 
                 codeLenses.push(codeLens);
+                return;
+            }
+            
+            // Se estamos dentro de uma interface
+            if (currentInterface) {
+                // Conta chaves para detectar fim da interface
+                braceCount += (line.match(/\{/g) || []).length;
+                braceCount -= (line.match(/\}/g) || []).length;
+                
+                if (braceCount === 0) {
+                    currentInterface = null;
+                    return;
+                }
+                
+                // Detecta métodos dentro da interface
+                const methodMatch = line.match(methodRegex);
+                if (methodMatch && !line.trim().startsWith('//')) {
+                    const methodName = methodMatch[1];
+                    console.error(`  ✅ Found method: ${methodName} in ${currentInterface}`);
+                    const range = new vscode.Range(index, 0, index, line.length);
+                    
+                    // CodeLens para cada método
+                    const codeLens = new vscode.CodeLens(range, {
+                        title: "→ implementations",
+                        command: 'golang-implementation-lens.showMethodImplementations',
+                        arguments: [currentInterface, methodName, document.uri]
+                    });
+                    
+                    codeLenses.push(codeLens);
+                }
             }
         });
 
@@ -127,6 +164,19 @@ async function showImplementations(interfaceName, documentUri) {
                         const receiverType = receiverMatch[1];
                         console.error(`🔎 Extracted receiver type: "${receiverType}" from: ${filePath}:${lineNum}`);
                         
+                        // Filtrar mocks
+                        const isMockFile = filePath.includes('/mocks/') || 
+                                          filePath.includes('_mock.go') || 
+                                          filePath.includes('mock_');
+                        const isMockType = receiverType.includes('Mock') || 
+                                          receiverType.includes('mock') ||
+                                          receiverType.startsWith('_');
+                        
+                        if (isMockFile || isMockType) {
+                            console.error(`🚫 Skipping mock: ${receiverType}`);
+                            continue;
+                        }
+                        
                         // Evita duplicatas
                         if (processedTypes.has(receiverType)) {
                             console.error(`⏭️ Skipping duplicate: ${receiverType}`);
@@ -195,6 +245,130 @@ async function showImplementations(interfaceName, documentUri) {
                         }
                         
                         const position = new vscode.Position(structLine, 0);
+                        editor.selection = new vscode.Selection(position, position);
+                        editor.revealRange(
+                            new vscode.Range(position, position), 
+                            vscode.TextEditorRevealType.InCenter
+                        );
+                    } catch (err) {
+                        vscode.window.showErrorMessage(`Error opening file: ${err.message}`);
+                    }
+                }
+                
+                resolve();
+            });
+        });
+    });
+}
+
+async function showMethodImplementations(interfaceName, methodName, documentUri) {
+    console.error(`🎯 showMethodImplementations called for: ${interfaceName}.${methodName}`);
+    const workspaceFolder = vscode.workspace.getWorkspaceFolder(documentUri);
+    if (!workspaceFolder) {
+        vscode.window.showErrorMessage('No workspace folder found');
+        return;
+    }
+
+    const workspacePath = workspaceFolder.uri.fsPath;
+    
+    // Busca por implementações do método específico
+    const cmd = `cd "${workspacePath}" && grep -rn "^func.*${methodName}" --include="*.go" . 2>/dev/null`;
+    
+    console.error(`📍 Finding implementations of ${methodName} with: ${cmd}`);
+
+    await vscode.window.withProgress({
+        location: vscode.ProgressLocation.Notification,
+        title: `Searching ${methodName} implementations...`,
+        cancellable: false
+    }, async () => {
+        return new Promise((resolve) => {
+            exec(cmd, { timeout: 5000, maxBuffer: 1024 * 1024 }, async (error, stdout, stderr) => {
+                console.error(`📤 stdout for ${methodName}:`, stdout);
+                
+                if (error && !stdout) {
+                    vscode.window.showWarningMessage(`No implementations found for ${methodName}`);
+                    console.error(`❌ Error:`, error);
+                    resolve();
+                    return;
+                }
+
+                if (!stdout || stdout.trim().length === 0) {
+                    vscode.window.showInformationMessage(`No implementations found for ${methodName}`);
+                    resolve();
+                    return;
+                }
+
+                const lines = stdout.trim().split('\n');
+                console.error(`📊 Found ${lines.length} matches for ${methodName}`);
+                
+                const items = [];
+                const processedItems = new Set();
+                
+                for (const line of lines) {
+                    const match = line.match(/^(.+):(\d+):(.*)$/);
+                    if (match) {
+                        const filePath = match[1];
+                        const lineNum = parseInt(match[2]) - 1;
+                        const content = match[3].trim();
+                        
+                        // Extrai o tipo do receiver: func (r *ReceiverType) Method
+                        const receiverMatch = content.match(/func\s+\(\s*\w+\s+\*?(\w+)\s*\)/);
+                        if (!receiverMatch) continue;
+                        
+                        const receiverType = receiverMatch[1];
+                        
+                        // Filtrar mocks
+                        const isMockFile = filePath.includes('/mocks/') || 
+                                          filePath.includes('_mock.go') || 
+                                          filePath.includes('mock_');
+                        const isMockType = receiverType.includes('Mock') || 
+                                          receiverType.includes('mock') ||
+                                          receiverType.startsWith('_');
+                        
+                        if (isMockFile || isMockType) {
+                            console.error(`  🚫 Skipping mock: ${receiverType} in ${filePath}`);
+                            continue;
+                        }
+                        
+                        const key = `${receiverType}:${filePath}`;
+                        
+                        // Evita duplicatas
+                        if (processedItems.has(key)) continue;
+                        processedItems.add(key);
+                        
+                        const fullPath = path.isAbsolute(filePath) ? filePath : path.join(workspacePath, filePath);
+                        const fileName = path.basename(fullPath);
+                        const dirName = path.basename(path.dirname(fullPath));
+                        
+                        items.push({
+                            label: `$(symbol-method) ${receiverType}.${methodName}`,
+                            description: `${dirName}/${fileName}:${lineNum + 1}`,
+                            detail: content,
+                            filePath: fullPath,
+                            lineNum: lineNum,
+                            receiverType: receiverType
+                        });
+                    }
+                }
+
+                if (items.length === 0) {
+                    vscode.window.showInformationMessage(`No implementations found for ${methodName}`);
+                    resolve();
+                    return;
+                }
+
+                const selected = await vscode.window.showQuickPick(items, {
+                    placeHolder: `${items.length} implementation(s) of ${interfaceName}.${methodName} - Select to navigate`,
+                    matchOnDescription: true,
+                    matchOnDetail: true
+                });
+
+                if (selected) {
+                    try {
+                        const document = await vscode.workspace.openTextDocument(selected.filePath);
+                        const editor = await vscode.window.showTextDocument(document);
+                        
+                        const position = new vscode.Position(selected.lineNum, 0);
                         editor.selection = new vscode.Selection(position, position);
                         editor.revealRange(
                             new vscode.Range(position, position), 
@@ -293,6 +467,13 @@ function activate(context) {
         vscode.commands.registerCommand(
             'golang-implementation-lens.showImplementations', 
             showImplementations
+        )
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand(
+            'golang-implementation-lens.showMethodImplementations', 
+            showMethodImplementations
         )
     );
 

@@ -1,15 +1,17 @@
 # Golang Implementation Lens
 
-[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/fabioods/golang-implementation-lens)
+[![Version](https://img.shields.io/badge/version-1.1.1-blue.svg)](https://github.com/fabioods/golang-implementation-lens)
 [![VSCode](https://img.shields.io/badge/VSCode-1.60+-green.svg)](https://code.visualstudio.com/)
 
-> Show implementation count above Go interfaces with one-click navigation.
+> Show implementation count above Go interfaces with one-click navigation to interface and method implementations.
 
 ## ✨ Features
 
 - 🔍 **Visual CodeLens** above every Go interface showing "👁️ implementations"
+- 🎯 **Method-level CodeLens** - Each method has "→ implementations" for direct navigation
 - 📊 **Click to navigate** - Opens a quick pick with all implementations
 - ⚡ **Fast search** using grep for instant results
+- 🚫 **Smart filtering** - Automatically excludes mock implementations
 - 🏗️ **Multi-package support** - Works perfectly with Go modules
 - 💾 **Smart detection** - Intelligently finds types that implement all interface methods
 
@@ -17,14 +19,16 @@
 
 ### Interface with CodeLens
 ```go
-👁️ implementations                    ← Click here!
+👁️ implementations                                 ← Click to see all implementations
 type UserRepository interface {
+    → implementations                              ← Click to see FindByID implementations
     FindByID(id string) (*User, error)
+    → implementations                              ← Click to see Save implementations
     Save(user *User) error
 }
 ```
 
-### Quick Pick with Implementations
+### Quick Pick with Interface Implementations
 ```
 ┌─────────────────────────────────────────────────────┐
 │ Select implementation of UserRepository             │
@@ -32,26 +36,45 @@ type UserRepository interface {
 │ ○ PostgresUserRepository                            │
 │    in repository/postgres.go                        │
 │    Implements 2 method(s)                           │
+└─────────────────────────────────────────────────────┘
+Note: Mock implementations are automatically filtered out!
+```
+
+### Quick Pick with Method Implementations
+```
+┌─────────────────────────────────────────────────────┐
+│ 3 implementation(s) of UserRepository.FindByID      │
 ├─────────────────────────────────────────────────────┤
-│ ○ MockUserRepository                                │
-│    in repository/mock.go                            │
-│    Implements 2 method(s)                           │
+│ ○ PostgresUserRepository.FindByID                   │
+│    repository/postgres.go:45                        │
+│    func (r *PostgresUserRepository) FindByID...     │
+├─────────────────────────────────────────────────────┤
+│ ○ MemoryUserRepository.FindByID                     │
+│    repository/memory.go:23                          │
+│    func (r *MemoryUserRepository) FindByID...       │
 └─────────────────────────────────────────────────────┘
 ```
 
 ## 🚀 Usage
 
-### Method 1: CodeLens (Recommended)
+### Method 1: Interface CodeLens (Full Implementation)
 1. Open any Go file with an interface
 2. Look above the `type InterfaceName interface {` declaration
 3. Click on **"👁️ implementations"**
 4. Select the implementation from the list
-5. Navigate automatically to the struct!
+5. Navigate automatically to the struct declaration!
 
-### Method 2: Command Palette
+### Method 2: Method CodeLens (Direct Method Navigation) ⭐ NEW
+1. Open any Go file with an interface
+2. Look at each method inside the interface
+3. Click on **"→ implementations"** next to any method
+4. Select the specific implementation you want
+5. Navigate directly to that method implementation!
+
+### Method 3: Command Palette
 1. Press `Cmd+Shift+P` (Mac) or `Ctrl+Shift+P` (Windows/Linux)
-2. Type: **"Go: Show Implementations"**
-3. Enter the interface name
+2. Type: **"Go: Show Implementations"** or **"Go: Show Method Implementations"**
+3. Enter the interface/method name
 4. Select from the list
 
 ## 📋 Requirements
@@ -104,18 +127,30 @@ func (r *PostgresUserRepository) Save(user *User) error {
 
 ## 🎨 Configuration
 
-Currently, the extension works out-of-the-box with sensible defaults. Future versions may include:
+Currently, the extension works out-of-the-box with sensible defaults.
+
+### 🚫 Mock Filtering (v1.1.1+)
+
+The extension automatically filters out mock implementations to show only real code:
+- ✅ Excludes files in `/mocks/` directories
+- ✅ Excludes files with `_mock.go` or `mock_` patterns
+- ✅ Excludes types containing "Mock" or "mock" in the name
+- ✅ Excludes test helper types starting with `_`
+
+### Future Configuration Options
 
 - Configurable search directories
 - Custom search patterns
 - CodeLens appearance customization
 - Performance optimizations
+- Toggle mock filtering on/off
 
 ## 🔧 Commands
 
 | Command | Description |
 |---------|-------------|
-| `Go: Show Implementations` | Manually search for implementations |
+| `Go: Show Implementations` | Manually search for interface implementations |
+| `Go: Show Method Implementations` | Manually search for method implementations |
 | `Go: Clear Implementation Lens Cache` | Clear cached search results |
 
 ## 🐛 Troubleshooting

@@ -2,7 +2,7 @@
   "name": "golang-implementation-lens",
   "displayName": "Golang Implementation Lens",
   "description": "Show implementation count above Go interfaces with one-click navigation, similar to VS Code's native implementation lens",
-  "version": "1.0.0",
+  "version": "1.1.1",
   "publisher": "fabioods",
   "author": {
     "name": "Fabio Santos"
@@ -34,6 +34,11 @@
       {
         "command": "golang-implementation-lens.showImplementations",
         "title": "Go: Show Implementations",
+        "category": "Go"
+      },
+      {
+        "command": "golang-implementation-lens.showMethodImplementations",
+        "title": "Go: Show Method Implementations",
         "category": "Go"
       },
       {
