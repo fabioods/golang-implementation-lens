@@ -1,0 +1,71 @@
+{
+  "name": "golang-implementation-lens",
+  "displayName": "Golang Implementation Lens",
+  "description": "Show implementation count above Go interfaces with one-click navigation, similar to VS Code's native implementation lens",
+  "version": "1.0.0",
+  "publisher": "fabioods",
+  "author": {
+    "name": "Fabio Santos"
+  },
+  "license": "MIT",
+  "icon": "icon.png",
+  "engines": {
+    "vscode": "^1.60.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Other"
+  ],
+  "keywords": [
+    "go",
+    "golang",
+    "interface",
+    "implementation",
+    "codelens",
+    "navigation",
+    "go to implementation"
+  ],
+  "activationEvents": [
+    "onLanguage:go"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "golang-implementation-lens.showImplementations",
+        "title": "Go: Show Implementations",
+        "category": "Go"
+      },
+      {
+        "command": "golang-implementation-lens.clearCache",
+        "title": "Go: Clear Implementation Lens Cache",
+        "category": "Go"
+      }
+    ]
+  },
+  "scripts": {
+    "package": "vsce package",
+    "publish": "vsce publish"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/fabioods/golang-implementation-lens.git"
+  },
+  "bugs": {
+    "url": "https://github.com/fabioods/golang-implementation-lens/issues"
+  },
+  "homepage": "https://github.com/fabioods/golang-implementation-lens#readme",
+  "qna": "marketplace",
+  "badges": [
+    {
+      "url": "https://img.shields.io/badge/go-supported-blue.svg",
+      "href": "https://golang.org/",
+      "description": "Go Language Support"
+    }
+  ],
+  "galleryBanner": {
+    "color": "#00ADD8",
+    "theme": "dark"
+  }
+}
+
