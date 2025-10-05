@@ -5,6 +5,26 @@ All notable changes to the "Golang Implementation Lens" extension will be docume
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2025-10-05
+
+### Added
+- 🔙 **Goto Interface**: Reverse navigation from implementation methods to interface declarations
+- 🎯 New CodeLens "← goto interface" on struct/type methods
+- 📋 New command: "Go: Goto Interface"
+- 🔍 Smart interface detection that finds which interfaces declare a specific method
+- 🚫 Automatic filtering of mock methods in goto interface feature
+
+### Changed
+- Enhanced CodeLens provider system with bidirectional navigation
+- Improved method detection with support for both pointer and value receivers
+- Better integration with existing implementation search
+
+### Technical Improvements
+- Added `GolangGotoInterfaceLensProvider` class for reverse navigation
+- New `gotoInterface` function that searches for interfaces declaring specific methods
+- Validates interface methods before showing in quick pick
+- Reuses existing `extractInterfaceMethods` helper for consistency
+
 ## [1.1.2] - 2025-10-05
 
 ### Changed
@@ -88,14 +108,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Upcoming Features
 
-### [1.2.0] - Planned
+### [1.3.0] - Planned
 - [ ] Support for embedded interfaces
 - [ ] Configurable search directories
 - [ ] Better performance for large projects
 - [ ] Show method count in CodeLens
 - [ ] Support for generic interfaces (Go 1.18+)
 
-### [1.3.0] - Planned
+### [1.4.0] - Planned
 - [ ] Show interface implementation status
 - [ ] Highlight missing methods
 - [ ] Quick fix for incomplete implementations
@@ -114,6 +134,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date | Description |
 |---------|------|-------------|
+| 1.2.0 | 2025-10-05 | Goto Interface - Reverse navigation feature |
 | 1.1.2 | 2025-10-05 | Updated icon with Go brand colors |
 | 1.1.1 | 2025-10-05 | Automatic mock filtering |
 | 1.1.0 | 2025-10-05 | Method-level CodeLens and navigation |

@@ -1,6 +1,6 @@
 # Golang Implementation Lens
 
-[![Version](https://img.shields.io/badge/version-1.1.2-blue.svg)](https://github.com/fabioods/golang-implementation-lens)
+[![Version](https://img.shields.io/badge/version-1.2.0-blue.svg)](https://github.com/fabioods/golang-implementation-lens)
 [![VSCode](https://img.shields.io/badge/VSCode-1.60+-green.svg)](https://code.visualstudio.com/)
 
 > Show implementation count above Go interfaces with one-click navigation to interface and method implementations.
@@ -9,6 +9,7 @@
 
 - 🔍 **Visual CodeLens** above every Go interface showing "👁️ implementations"
 - 🎯 **Method-level CodeLens** - Each method has "→ implementations" for direct navigation
+- 🔙 **Goto Interface** Navigate from implementation methods back to their interface declarations with "← goto interface"
 - 📊 **Click to navigate** - Opens a quick pick with all implementations
 - ⚡ **Fast search** using grep for instant results
 - 🚫 **Smart filtering** - Automatically excludes mock implementations
@@ -55,6 +56,15 @@ Note: Mock implementations are automatically filtered out!
 └─────────────────────────────────────────────────────┘
 ```
 
+### Goto Interface (Reverse Navigation) ⭐ NEW
+```go
+// In your implementation file
+← goto interface                                       ← Click to see which interfaces declare FindByID
+func (r *PostgresUserRepository) FindByID(id string) (*User, error) {
+    // implementation
+}
+```
+
 ## 🚀 Usage
 
 ### Method 1: Interface CodeLens (Full Implementation)
@@ -64,16 +74,23 @@ Note: Mock implementations are automatically filtered out!
 4. Select the implementation from the list
 5. Navigate automatically to the struct declaration!
 
-### Method 2: Method CodeLens (Direct Method Navigation) ⭐ NEW
+### Method 2: Method CodeLens (Direct Method Navigation)
 1. Open any Go file with an interface
 2. Look at each method inside the interface
 3. Click on **"→ implementations"** next to any method
 4. Select the specific implementation you want
 5. Navigate directly to that method implementation!
 
-### Method 3: Command Palette
+### Method 3: Goto Interface (Reverse Navigation) ⭐ NEW
+1. Open any Go file with a struct method implementation
+2. Look above the method declaration with receiver (e.g., `func (r *Type) Method()`)
+3. Click on **"← goto interface"**
+4. Select the interface that declares this method
+5. Navigate automatically to the interface declaration!
+
+### Method 4: Command Palette
 1. Press `Cmd+Shift+P` (Mac) or `Ctrl+Shift+P` (Windows/Linux)
-2. Type: **"Go: Show Implementations"** or **"Go: Show Method Implementations"**
+2. Type: **"Go: Show Implementations"**, **"Go: Show Method Implementations"**, or **"Go: Goto Interface"**
 3. Enter the interface/method name
 4. Select from the list
 
@@ -151,6 +168,7 @@ The extension automatically filters out mock implementations to show only real c
 |---------|-------------|
 | `Go: Show Implementations` | Manually search for interface implementations |
 | `Go: Show Method Implementations` | Manually search for method implementations |
+| `Go: Goto Interface` | Navigate from method implementation to interface declaration |
 | `Go: Clear Implementation Lens Cache` | Clear cached search results |
 
 ## 🐛 Troubleshooting

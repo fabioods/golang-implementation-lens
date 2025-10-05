@@ -88,6 +88,62 @@ class GolangImplementationLensProvider {
     }
 }
 
+// Provider para detectar métodos de structs e mostrar "goto interface"
+class GolangGotoInterfaceLensProvider {
+    constructor() {
+        console.error('📦 GolangGotoInterfaceLensProvider CONSTRUCTOR called');
+        this._onDidChangeCodeLenses = new vscode.EventEmitter();
+        this.onDidChangeCodeLenses = this._onDidChangeCodeLenses.event;
+    }
+
+    provideCodeLenses(document, token) {
+        console.error(`🔙 GotoInterface provideCodeLenses called for: ${document.fileName}`);
+        const codeLenses = [];
+        const text = document.getText();
+        const lines = text.split('\n');
+        
+        // Regex para detectar métodos de structs: func (r *Type) MethodName(...) ...
+        const methodReceiverRegex = /^\s*func\s+\(\s*\w+\s+\*?(\w+)\s*\)\s+(\w+)\s*\(/;
+        
+        lines.forEach((line, index) => {
+            const match = line.match(methodReceiverRegex);
+            if (match) {
+                const receiverType = match[1];
+                const methodName = match[2];
+                
+                // Filtrar mocks e helpers
+                const isMock = receiverType.includes('Mock') || 
+                              receiverType.includes('mock') ||
+                              receiverType.startsWith('_');
+                
+                if (isMock) {
+                    console.error(`  🚫 Skipping mock method: ${receiverType}.${methodName}`);
+                    return;
+                }
+                
+                console.error(`  ✅ Found struct method: ${receiverType}.${methodName} at line ${index + 1}`);
+                const range = new vscode.Range(index, 0, index, line.length);
+                
+                // CodeLens para navegar para interface
+                const codeLens = new vscode.CodeLens(range, {
+                    title: "← goto interface",
+                    command: 'golang-implementation-lens.gotoInterface',
+                    arguments: [receiverType, methodName, document.uri]
+                });
+                
+                codeLenses.push(codeLens);
+            }
+        });
+
+        console.error(`📊 Returning ${codeLenses.length} GotoInterface CodeLens(es)`);
+        return codeLenses;
+    }
+
+    resolveCodeLens(codeLens, token) {
+        return codeLens;
+    }
+}
+
 async function showImplementations(interfaceName, documentUri) {
     console.error(`🎯 showImplementations called for: ${interfaceName}`);
     const workspaceFolder = vscode.workspace.getWorkspaceFolder(documentUri);
@@ -385,6 +441,124 @@ async function showMethodImplementations(interfaceName, methodName, documentUri)
     });
 }
 
+async function gotoInterface(receiverType, methodName, documentUri) {
+    console.error(`🔙 gotoInterface called for: ${receiverType}.${methodName}`);
+    const workspaceFolder = vscode.workspace.getWorkspaceFolder(documentUri);
+    if (!workspaceFolder) {
+        vscode.window.showErrorMessage('No workspace folder found');
+        return;
+    }
+
+    const workspacePath = workspaceFolder.uri.fsPath;
+    
+    // Busca por interfaces que declaram este método
+    const cmd = `cd "${workspacePath}" && grep -rn "type.*interface" --include="*.go" . 2>/dev/null`;
+    
+    console.error(`🔍 Searching interfaces with: ${cmd}`);
+
+    await vscode.window.withProgress({
+        location: vscode.ProgressLocation.Notification,
+        title: `Searching interfaces with ${methodName}...`,
+        cancellable: false
+    }, async () => {
+        return new Promise((resolve) => {
+            exec(cmd, { timeout: 5000, maxBuffer: 1024 * 1024 }, async (error, stdout, stderr) => {
+                if (error && !stdout) {
+                    vscode.window.showWarningMessage(`No interfaces found`);
+                    console.error(`❌ Error:`, error);
+                    resolve();
+                    return;
+                }
+
+                if (!stdout || stdout.trim().length === 0) {
+                    vscode.window.showInformationMessage(`No interfaces found`);
+                    resolve();
+                    return;
+                }
+
+                const lines = stdout.trim().split('\n');
+                console.error(`📊 Found ${lines.length} interface declarations`);
+                
+                const items = [];
+                
+                for (const line of lines) {
+                    const match = line.match(/^(.+):(\d+):(.*)$/);
+                    if (match) {
+                        const filePath = match[1];
+                        const lineNum = parseInt(match[2]) - 1;
+                        const content = match[3].trim();
+                        
+                        // Extrai nome da interface: type InterfaceName interface
+                        const interfaceMatch = content.match(/type\s+(\w+)\s+interface/);
+                        if (!interfaceMatch) continue;
+                        
+                        const interfaceName = interfaceMatch[1];
+                        
+                        // Verifica se a interface contém o método
+                        const fullPath = path.isAbsolute(filePath) ? filePath : path.join(workspacePath, filePath);
+                        
+                        try {
+                            const document = await vscode.workspace.openTextDocument(fullPath);
+                            const interfaceMethods = extractInterfaceMethods(document.getText(), interfaceName);
+                            
+                            if (!interfaceMethods.includes(methodName)) {
+                                console.error(`  ⏭️ ${interfaceName} doesn't have method ${methodName}`);
+                                continue;
+                            }
+                            
+                            console.error(`  ✅ ${interfaceName} contains ${methodName}`);
+                            
+                            const fileName = path.basename(fullPath);
+                            const dirName = path.basename(path.dirname(fullPath));
+                            
+                            items.push({
+                                label: `$(symbol-interface) ${interfaceName}`,
+                                description: `${dirName}/${fileName}:${lineNum + 1}`,
+                                detail: `Interface with ${interfaceMethods.length} method(s)`,
+                                filePath: fullPath,
+                                lineNum: lineNum,
+                                interfaceName: interfaceName
+                            });
+                        } catch (err) {
+                            console.error(`❌ Error reading ${filePath}:`, err);
+                        }
+                    }
+                }
+
+                if (items.length === 0) {
+                    vscode.window.showInformationMessage(`No interfaces found declaring ${methodName}`);
+                    resolve();
+                    return;
+                }
+
+                const selected = await vscode.window.showQuickPick(items, {
+                    placeHolder: `${items.length} interface(s) declaring ${methodName} - Select to navigate`,
+                    matchOnDescription: true,
+                    matchOnDetail: true
+                });
+
+                if (selected) {
+                    try {
+                        const document = await vscode.workspace.openTextDocument(selected.filePath);
+                        const editor = await vscode.window.showTextDocument(document);
+                        
+                        const position = new vscode.Position(selected.lineNum, 0);
+                        editor.selection = new vscode.Selection(position, position);
+                        editor.revealRange(
+                            new vscode.Range(position, position), 
+                            vscode.TextEditorRevealType.InCenter
+                        );
+                    } catch (err) {
+                        vscode.window.showErrorMessage(`Error opening file: ${err.message}`);
+                    }
+                }
+                
+                resolve();
+            });
+        });
+    });
+}
+
 function extractInterfaceMethods(text, interfaceName) {
     const methods = [];
     const lines = text.split('\n');
@@ -453,12 +627,23 @@ function activate(context) {
     vscode.window.showInformationMessage('🎉 Golang Implementation Lens is active!');
 
     const provider = new GolangImplementationLensProvider();
+    const gotoInterfaceProvider = new GolangGotoInterfaceLensProvider();
     
-    console.error('📝 Registering CodeLens provider...');
+    console.error('📝 Registering CodeLens providers...');
+    
+    // Provider para interfaces -> implementações
     context.subscriptions.push(
         vscode.languages.registerCodeLensProvider(
             { language: 'go', scheme: 'file' }, 
             provider
+        )
+    );
+    
+    // Provider para implementações -> interfaces
+    context.subscriptions.push(
+        vscode.languages.registerCodeLensProvider(
+            { language: 'go', scheme: 'file' }, 
+            gotoInterfaceProvider
         )
     );
 
@@ -476,6 +661,13 @@ function activate(context) {
             showMethodImplementations
         )
     );
+    
+    context.subscriptions.push(
+        vscode.commands.registerCommand(
+            'golang-implementation-lens.gotoInterface', 
+            gotoInterface
+        )
+    );
 
     context.subscriptions.push(
         vscode.commands.registerCommand(
@@ -484,6 +676,7 @@ function activate(context) {
                 provider.cache.clear();
                 vscode.window.showInformationMessage('✅ Cache cleared!');
                 provider._onDidChangeCodeLenses.fire();
+                gotoInterfaceProvider._onDidChangeCodeLenses.fire();
             }
         )
     );

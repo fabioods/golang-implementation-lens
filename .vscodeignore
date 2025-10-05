@@ -1,0 +1,15 @@
+.vscode/**
+.vscode-test/**
+node_modules/**
+.gitignore
+.git/**
+*.vsix
+*.log
+.DS_Store
+*.bak
+.env
+PUBLISH_GUIDE.md
+COMO_ATUALIZAR.md
+TODO.md
+publish.sh
+publish.fish
