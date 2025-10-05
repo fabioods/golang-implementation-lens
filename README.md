@@ -1,6 +1,6 @@
 # Golang Implementation Lens
 
-[![Version](https://img.shields.io/badge/version-1.1.1-blue.svg)](https://github.com/fabioods/golang-implementation-lens)
+[![Version](https://img.shields.io/badge/version-1.1.2-blue.svg)](https://github.com/fabioods/golang-implementation-lens)
 [![VSCode](https://img.shields.io/badge/VSCode-1.60+-green.svg)](https://code.visualstudio.com/)
 
 > Show implementation count above Go interfaces with one-click navigation to interface and method implementations.
