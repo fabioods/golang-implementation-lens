@@ -117,23 +117,36 @@ async function showImplementations(interfaceName, documentUri) {
                         const content = match[3].trim();
                         
                         // Extrai o tipo do receiver: func (r *ReceiverType) Method
-                        const receiverMatch = content.match(/func\s+\([^)]*\*?(\w+)\)/);
-                        if (!receiverMatch) continue;
+                        // Padrão: func (variavel *Tipo) ou func (variavel Tipo)
+                        const receiverMatch = content.match(/func\s+\(\s*\w+\s+\*?(\w+)\s*\)/);
+                        if (!receiverMatch) {
+                            console.error(`⚠️ Could not extract receiver from: ${content}`);
+                            continue;
+                        }
                         
                         const receiverType = receiverMatch[1];
+                        console.error(`🔎 Extracted receiver type: "${receiverType}" from: ${filePath}:${lineNum}`);
                         
                         // Evita duplicatas
-                        if (processedTypes.has(receiverType)) continue;
+                        if (processedTypes.has(receiverType)) {
+                            console.error(`⏭️ Skipping duplicate: ${receiverType}`);
+                            continue;
+                        }
                         
                         // Verifica se o tipo implementa todos os métodos da interface
                         const fullPath = path.isAbsolute(filePath) ? filePath : path.join(workspacePath, filePath);
+                        console.error(`🔍 Checking type: ${receiverType} in ${filePath}`);
                         const implementsAll = await checkAllMethodsImplemented(
                             fullPath,
                             receiverType,
                             interfaceMethods
                         );
                         
-                        if (!implementsAll) continue;
+                        if (!implementsAll) {
+                            console.error(`❌ ${receiverType} does NOT implement all methods`);
+                            continue;
+                        }
+                        console.error(`✅ ${receiverType} implements all methods!`);
                         
                         processedTypes.add(receiverType);
                         
@@ -239,14 +252,18 @@ async function checkAllMethodsImplemented(filePath, receiverType, methods) {
         const document = await vscode.workspace.openTextDocument(filePath);
         const text = document.getText();
         
+        console.error(`  📝 Checking ${methods.length} methods for ${receiverType}`);
+        
         // Verifica se todos os métodos estão implementados
         for (const method of methods) {
             const pattern = new RegExp(`func\\s+\\([^)]*\\*?${receiverType}\\)\\s+${method}\\s*\\(`);
             if (!pattern.test(text)) {
+                console.error(`  ❌ Missing method: ${method}`);
                 return false;
             }
         }
         
+        console.error(`  ✅ All ${methods.length} methods found!`);
         return true;
     } catch (err) {
         console.error(`❌ Error reading file ${filePath}:`, err);
