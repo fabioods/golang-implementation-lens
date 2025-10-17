@@ -19,59 +19,81 @@ class GolangImplementationLensProvider {
         const codeLenses = [];
         const text = document.getText();
         const lines = text.split('\n');
-        
-        // Regex to match Go interface declarations: type InterfaceName interface {
+
+        // Regex to match Go interface declarations:
+        // - type InterfaceName interface {
+        // - InterfaceName interface { (dentro de um bloco type)
         const interfaceRegex = /^\s*type\s+(\w+)\s+interface\s*\{/;
+        const interfaceInBlockRegex = /^\s*(\w+)\s+interface\s*\{/;
         const methodRegex = /^\s*(\w+)\s*\(/;
-        
+
         let currentInterface = null;
         let braceCount = 0;
 
         lines.forEach((line, index) => {
-            // Detecta início da interface
+            // Detecta início da interface (formato padrão)
             const interfaceMatch = line.match(interfaceRegex);
             if (interfaceMatch) {
                 currentInterface = interfaceMatch[1];
                 braceCount = 1;
                 console.error(`✅ Found interface: ${currentInterface} at line ${index + 1}`);
                 const range = new vscode.Range(index, 0, index, line.length);
-                
+
                 // CodeLens para toda a interface
                 const codeLens = new vscode.CodeLens(range, {
                     title: "👁️ implementations",
                     command: 'golang-implementation-lens.showImplementations',
                     arguments: [currentInterface, document.uri]
                 });
-                
+
                 codeLenses.push(codeLens);
                 return;
             }
-            
+
+            // Detecta início da interface dentro de um bloco type (sem a palavra "type")
+            const interfaceInBlockMatch = line.match(interfaceInBlockRegex);
+            if (interfaceInBlockMatch && !currentInterface) {
+                currentInterface = interfaceInBlockMatch[1];
+                braceCount = 1;
+                console.error(`✅ Found interface in type block: ${currentInterface} at line ${index + 1}`);
+                const range = new vscode.Range(index, 0, index, line.length);
+
+                // CodeLens para toda a interface
+                const codeLens = new vscode.CodeLens(range, {
+                    title: "👁️ implementations",
+                    command: 'golang-implementation-lens.showImplementations',
+                    arguments: [currentInterface, document.uri]
+                });
+
+                codeLenses.push(codeLens);
+                return;
+            }
+
             // Se estamos dentro de uma interface
             if (currentInterface) {
                 // Conta chaves para detectar fim da interface
                 braceCount += (line.match(/\{/g) || []).length;
                 braceCount -= (line.match(/\}/g) || []).length;
-                
+
                 if (braceCount === 0) {
                     currentInterface = null;
                     return;
                 }
-                
+
                 // Detecta métodos dentro da interface
                 const methodMatch = line.match(methodRegex);
                 if (methodMatch && !line.trim().startsWith('//')) {
                     const methodName = methodMatch[1];
                     console.error(`  ✅ Found method: ${methodName} in ${currentInterface}`);
                     const range = new vscode.Range(index, 0, index, line.length);
-                    
+
                     // CodeLens para cada método
                     const codeLens = new vscode.CodeLens(range, {
                         title: "→ implementations",
                         command: 'golang-implementation-lens.showMethodImplementations',
                         arguments: [currentInterface, methodName, document.uri]
                     });
-                    
+
                     codeLenses.push(codeLens);
                 }
             }
@@ -450,10 +472,10 @@ async function gotoInterface(receiverType, methodName, documentUri) {
     }
 
     const workspacePath = workspaceFolder.uri.fsPath;
-    
-    // Busca por interfaces que declaram este método
-    const cmd = `cd "${workspacePath}" && grep -rn "type.*interface" --include="*.go" . 2>/dev/null`;
-    
+
+    // Busca por interfaces que declaram este método (ambos formatos: type X interface e X interface)
+    const cmd = `cd "${workspacePath}" && grep -rn "interface\\s*{" --include="*.go" . 2>/dev/null`;
+
     console.error(`🔍 Searching interfaces with: ${cmd}`);
 
     await vscode.window.withProgress({
@@ -487,11 +509,15 @@ async function gotoInterface(receiverType, methodName, documentUri) {
                         const filePath = match[1];
                         const lineNum = parseInt(match[2]) - 1;
                         const content = match[3].trim();
-                        
-                        // Extrai nome da interface: type InterfaceName interface
-                        const interfaceMatch = content.match(/type\s+(\w+)\s+interface/);
+
+                        // Extrai nome da interface: type InterfaceName interface OU InterfaceName interface (dentro de bloco)
+                        let interfaceMatch = content.match(/type\s+(\w+)\s+interface/);
+                        if (!interfaceMatch) {
+                            // Tenta o formato de bloco type
+                            interfaceMatch = content.match(/^\s*(\w+)\s+interface/);
+                        }
                         if (!interfaceMatch) continue;
-                        
+
                         const interfaceName = interfaceMatch[1];
                         
                         // Verifica se a interface contém o método
@@ -562,28 +588,36 @@ async function gotoInterface(receiverType, methodName, documentUri) {
 function extractInterfaceMethods(text, interfaceName) {
     const methods = [];
     const lines = text.split('\n');
-    
+
     let inInterface = false;
     let braceCount = 0;
-    
+
     for (const line of lines) {
-        // Detecta início da interface
+        // Detecta início da interface (formato padrão)
         const interfaceStart = line.match(new RegExp(`type\\s+${interfaceName}\\s+interface\\s*\\{`));
         if (interfaceStart) {
             inInterface = true;
             braceCount = 1;
             continue;
         }
-        
+
+        // Detecta início da interface dentro de um bloco type
+        const interfaceInBlockStart = line.match(new RegExp(`^\\s*${interfaceName}\\s+interface\\s*\\{`));
+        if (interfaceInBlockStart) {
+            inInterface = true;
+            braceCount = 1;
+            continue;
+        }
+
         if (inInterface) {
             // Conta chaves para detectar fim da interface
             braceCount += (line.match(/\{/g) || []).length;
             braceCount -= (line.match(/\}/g) || []).length;
-            
+
             if (braceCount === 0) {
                 break;
             }
-            
+
             // Extrai nome do método (ignora linhas vazias e comentários)
             const methodMatch = line.match(/^\s*(\w+)\s*\(/);
             if (methodMatch && !line.trim().startsWith('//')) {
@@ -591,7 +625,7 @@ function extractInterfaceMethods(text, interfaceName) {
             }
         }
     }
-    
+
     return methods;
 }
 

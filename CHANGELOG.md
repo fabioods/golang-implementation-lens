@@ -5,6 +5,37 @@ All notable changes to the "Golang Implementation Lens" extension will be docume
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.2] - 2025-10-17
+
+### Fixed
+- 🐛 **Goto Interface with Type Blocks**: Fixed "goto interface" feature to work with interfaces declared inside `type (...)` blocks
+- Updated grep pattern in `gotoInterface` function to search for `interface\s*{` instead of `type.*interface`
+- Enhanced interface name extraction to support both standard and block-style declarations
+
+### Technical Improvements
+- Modified grep command to capture all interface declarations regardless of format
+- Added fallback regex matching for interfaces without `type` keyword prefix
+- Improved compatibility between forward (interface → implementation) and reverse (implementation → interface) navigation
+
+## [1.2.1] - 2025-10-17
+
+### Fixed
+- 🐛 **Type Block Support**: Fixed detection of interfaces declared inside `type (...)` blocks
+- Now correctly detects interfaces like:
+  ```go
+  type (
+      InterfaceName interface {
+          Method() error
+      }
+  )
+  ```
+- Updated `extractInterfaceMethods` function to parse both standard and block-style declarations
+
+### Technical Improvements
+- Added `interfaceInBlockRegex` pattern to detect interfaces without the `type` keyword prefix
+- Enhanced method extraction to handle both declaration styles
+- Improved compatibility with Go code style variations
+
 ## [1.2.0] - 2025-10-05
 
 ### Added
