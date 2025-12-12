@@ -6,6 +6,56 @@ console.error('================================================');
 console.error('🚀 GOLANG IMPLEMENTATION LENS - MODULE LOADED');
 console.error('================================================');
 
+// Configuration helper functions
+function getConfiguration() {
+    const config = vscode.workspace.getConfiguration('golangImplementationLens');
+    return {
+        excludedFolders: config.get('excludedFolders', ['mocks', 'mock', 'testdata', 'vendor']),
+        excludedFilePatterns: config.get('excludedFilePatterns', ['_mock.go', 'mock_', '.pb.go', '_test.go']),
+        excludedTypePatterns: config.get('excludedTypePatterns', ['Mock', 'mock', 'Stub', 'Fake'])
+    };
+}
+
+function shouldExclude(filePath, receiverType) {
+    const config = getConfiguration();
+
+    // Check if file path contains any excluded folders
+    const pathParts = filePath.split(path.sep);
+    for (const folder of config.excludedFolders) {
+        if (pathParts.includes(folder)) {
+            console.error(`  🚫 Excluded by folder pattern: ${folder}`);
+            return true;
+        }
+    }
+
+    // Check if file matches any excluded file patterns
+    const fileName = path.basename(filePath);
+    for (const pattern of config.excludedFilePatterns) {
+        if (fileName.includes(pattern)) {
+            console.error(`  🚫 Excluded by file pattern: ${pattern}`);
+            return true;
+        }
+    }
+
+    // Check if type matches any excluded type patterns
+    if (receiverType) {
+        for (const pattern of config.excludedTypePatterns) {
+            if (receiverType.includes(pattern)) {
+                console.error(`  🚫 Excluded by type pattern: ${pattern}`);
+                return true;
+            }
+        }
+
+        // Also check for types starting with underscore (test helpers)
+        if (receiverType.startsWith('_')) {
+            console.error(`  🚫 Excluded type starting with underscore`);
+            return true;
+        }
+    }
+
+    return false;
+}
+
 class GolangImplementationLensProvider {
     constructor() {
         console.error('📦 GolangImplementationLensProvider CONSTRUCTOR called');
@@ -132,14 +182,10 @@ class GolangGotoInterfaceLensProvider {
             if (match) {
                 const receiverType = match[1];
                 const methodName = match[2];
-                
-                // Filtrar mocks e helpers
-                const isMock = receiverType.includes('Mock') || 
-                              receiverType.includes('mock') ||
-                              receiverType.startsWith('_');
-                
-                if (isMock) {
-                    console.error(`  🚫 Skipping mock method: ${receiverType}.${methodName}`);
+
+                // Check if should be excluded based on configuration
+                if (shouldExclude(document.fileName, receiverType)) {
+                    console.error(`  🚫 Skipping excluded method: ${receiverType}.${methodName}`);
                     return;
                 }
                 
@@ -241,17 +287,10 @@ async function showImplementations(interfaceName, documentUri) {
                         
                         const receiverType = receiverMatch[1];
                         console.error(`🔎 Extracted receiver type: "${receiverType}" from: ${filePath}:${lineNum}`);
-                        
-                        // Filtrar mocks
-                        const isMockFile = filePath.includes('/mocks/') || 
-                                          filePath.includes('_mock.go') || 
-                                          filePath.includes('mock_');
-                        const isMockType = receiverType.includes('Mock') || 
-                                          receiverType.includes('mock') ||
-                                          receiverType.startsWith('_');
-                        
-                        if (isMockFile || isMockType) {
-                            console.error(`🚫 Skipping mock: ${receiverType}`);
+
+                        // Check if should be excluded based on configuration
+                        if (shouldExclude(filePath, receiverType)) {
+                            console.error(`🚫 Skipping excluded: ${receiverType}`);
                             continue;
                         }
                         
@@ -392,19 +431,12 @@ async function showMethodImplementations(interfaceName, methodName, documentUri)
                         // Extrai o tipo do receiver: func (r *ReceiverType) Method
                         const receiverMatch = content.match(/func\s+\(\s*\w+\s+\*?(\w+)\s*\)/);
                         if (!receiverMatch) continue;
-                        
+
                         const receiverType = receiverMatch[1];
-                        
-                        // Filtrar mocks
-                        const isMockFile = filePath.includes('/mocks/') || 
-                                          filePath.includes('_mock.go') || 
-                                          filePath.includes('mock_');
-                        const isMockType = receiverType.includes('Mock') || 
-                                          receiverType.includes('mock') ||
-                                          receiverType.startsWith('_');
-                        
-                        if (isMockFile || isMockType) {
-                            console.error(`  🚫 Skipping mock: ${receiverType} in ${filePath}`);
+
+                        // Check if should be excluded based on configuration
+                        if (shouldExclude(filePath, receiverType)) {
+                            console.error(`  🚫 Skipping excluded: ${receiverType} in ${filePath}`);
                             continue;
                         }
                         

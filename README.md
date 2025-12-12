@@ -144,23 +144,69 @@ func (r *PostgresUserRepository) Save(user *User) error {
 
 ## 🎨 Configuration
 
-Currently, the extension works out-of-the-box with sensible defaults.
+The extension works out-of-the-box with sensible defaults, but you can customize the filtering behavior to match your project structure.
 
-### 🚫 Mock Filtering (v1.1.1+)
+### 🚫 Filtering Configuration
 
-The extension automatically filters out mock implementations to show only real code:
-- ✅ Excludes files in `/mocks/` directories
-- ✅ Excludes files with `_mock.go` or `mock_` patterns
-- ✅ Excludes types containing "Mock" or "mock" in the name
-- ✅ Excludes test helper types starting with `_`
+You can configure which folders, files, and types to exclude from the implementation search. This is useful for filtering out mocks, generated code, test files, and vendor dependencies.
 
-### Future Configuration Options
+#### Settings
 
-- Configurable search directories
-- Custom search patterns
-- CodeLens appearance customization
-- Performance optimizations
-- Toggle mock filtering on/off
+Open VS Code/Cursor settings (`Cmd+,` or `Ctrl+,`) and search for "Golang Implementation Lens" to configure:
+
+**`golangImplementationLens.excludedFolders`**
+- Array of folder names to exclude from search
+- Default: `["mocks", "mock", "testdata", "vendor"]`
+- Example: Add custom folders like `["mocks", "mock", "testdata", "vendor", "generated", "third_party"]`
+
+**`golangImplementationLens.excludedFilePatterns`**
+- Array of file name patterns to exclude
+- Default: `["_mock.go", "mock_", ".pb.go", "_test.go"]`
+- Example: Add proto files like `["_mock.go", "mock_", ".pb.go", "_test.go", ".gen.go"]`
+
+**`golangImplementationLens.excludedTypePatterns`**
+- Array of type name patterns to exclude
+- Default: `["Mock", "mock", "Stub", "Fake"]`
+- Example: Add custom patterns like `["Mock", "mock", "Stub", "Fake", "Test", "Dummy"]`
+
+#### Configuration Example
+
+Add to your `settings.json`:
+
+```json
+{
+  "golangImplementationLens.excludedFolders": [
+    "mocks",
+    "mock",
+    "testdata",
+    "vendor",
+    "generated",
+    "proto"
+  ],
+  "golangImplementationLens.excludedFilePatterns": [
+    "_mock.go",
+    "mock_",
+    ".pb.go",
+    "_test.go",
+    ".gen.go"
+  ],
+  "golangImplementationLens.excludedTypePatterns": [
+    "Mock",
+    "mock",
+    "Stub",
+    "Fake",
+    "Test"
+  ]
+}
+```
+
+#### How Filtering Works
+
+The extension checks each potential implementation against your configuration:
+1. **Folder Check**: Excludes if file path contains any excluded folder name
+2. **File Pattern Check**: Excludes if file name contains any excluded pattern
+3. **Type Pattern Check**: Excludes if type name contains any excluded pattern
+4. **Underscore Check**: Always excludes types starting with `_` (test helpers)
 
 ## 🔧 Commands
 
